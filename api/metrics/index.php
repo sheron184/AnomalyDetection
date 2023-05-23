@@ -1,0 +1,47 @@
+<?php
+require_once "/usr/share/centreon/www/class/centreonDB.class.php";
+
+
+$method = $_SERVER['REQUEST_METHOD'];
+$request = $_REQUEST;
+
+
+// Initialize a new database connection
+$db = new CentreonDB('centstorage');
+
+switch ($method) {
+    case 'POST':
+        $resData = [];
+        $jsonData = file_get_contents('php://input');
+        $data = json_decode($jsonData, true);
+        $query = sprintf('SELECT metric_name, metric_id FROM metrics where index_id in (select id from index_data where host_id = %d and service_id = %d);', $data["host"]["value"], $data['service']["value"]) ;
+        try {
+            $resp = $db->query($query);
+            while ($row = $resp->fetchRow()) {
+                // Preparing dataset suitable for the autocomplete component
+                $resData[] = [
+                    "label" => $row["metric_name"],
+                    "value" => $row["metric_id"]
+                ];
+            }
+        } catch (Exception $e) {
+            header('HTTP/1.1 500 Internal Server Error');
+            header('Content-Type: text/plain');
+            echo 'Something went wrong';
+            exit;
+        }
+        header('Content-Type: application/json');
+        $json = json_encode($resData);
+        echo $json;
+        break;
+    case 'GET':
+    case "PUT":
+    case "PATCH":
+    case "DELETE":
+    default :
+        header('HTTP/1.1 405 Method Not Allowed');
+        header('Allow: POST');
+        echo 'Only POST requests are allowed';
+
+}
+
